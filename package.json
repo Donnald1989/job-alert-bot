@@ -1,0 +1,17 @@
+{
+  "name": "job-alert-bot",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Lightweight job alert bot - checks RemoteOK, We Work Remotely, Jooble and Jobicy, and pushes new matches to Telegram instantly.",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "rss-parser": "^3.13.0"
+  }
+}

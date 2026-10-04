@@ -1,0 +1,42 @@
+name: Job Alert (Jooble + Jobicy)
+
+# Runs every 6 hours — Jooble's free tier is capped at 500 requests and
+# Jobicy's own fair-use notice asks for infrequent polling, so these two
+# stay off the 15-minute schedule (see job-alert.yml).
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  check-jobs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run job check
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          JOOBLE_API_KEY: ${{ secrets.JOOBLE_API_KEY }}
+        run: node src/index-jooble.js
+
+      - name: Save seen-jobs store
+        run: |
+          git config user.name "job-alert-bot"
+          git config user.email "actions@github.com"
+          git add data/seen.json
+          git diff --cached --quiet || git commit -m "Update seen jobs store [skip ci]"
+          git push
