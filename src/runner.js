@@ -4,6 +4,7 @@ const config = require('./config');
 const { loadSeen, saveSeen } = require('./store');
 const { sendTelegram } = require('./notify');
 const { shouldDropForLocation } = require('./locationFilter');
+const { findDirectLink, searchLink } = require('./directLink');
 
 function isFresh(job) {
   if (!job.postedAt) return true;
@@ -40,7 +41,8 @@ function escapeHtml(str = '') {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-function formatMessage(job) {
+async function formatMessage(job) {
+  const direct = await findDirectLink(job);
   const lines = [
     `🆕 <b>${escapeHtml(job.title)}</b>`,
     job.company ? `🏢 ${escapeHtml(job.company)}` : null,
@@ -48,7 +50,9 @@ function formatMessage(job) {
     `📍 ${job.source}`,
     job.location ? `🌍 ${escapeHtml(job.location)}` : null,
     job.salary ? `💰 ${escapeHtml(job.salary)}` : null,
-    `🔗 ${job.url}`
+    `🔗 ${job.url}`,
+    direct ? `🎯 Company page (${direct.via}): ${direct.url}` : null,
+    `🔎 Find on company site: ${searchLink(job)}`
   ].filter(Boolean);
   return lines.join('\n');
 }
@@ -92,7 +96,7 @@ async function run(fetchAllJobs, label) {
 
   for (const job of newMatches) {
     try {
-      await sendTelegram(token, chatId, formatMessage(job));
+      await sendTelegram(token, chatId, await formatMessage(job));
       console.log(`Notified: [${job.source}] ${job.title}`);
       seen[job.id] = Date.now();
       // Save after every alert, so stopping the run part-way (Ctrl+C, closed
@@ -114,4 +118,4 @@ async function run(fetchAllJobs, label) {
   saveSeen(seen);
 }
 
-module.exports = { run, locationDecision, isWatched, matchesKeywords };
+module.exports = { run, locationDecision, isWatched, matchesKeywords, formatMessage };
