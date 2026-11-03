@@ -6,6 +6,7 @@
 const config = require('./config');
 const { fetchJooble } = require('./sources/jooble');
 const { fetchJobicy } = require('./sources/jobicy');
+const { fetchRemotive } = require('./sources/remotive');
 const { run } = require('./runner');
 
 async function fetchAllJobs() {
@@ -32,10 +33,21 @@ async function fetchAllJobs() {
     console.error('[Jobicy] fetch failed:', err.message);
   }
 
+  try {
+    const remotiveJobs = await fetchRemotive({
+      recentLimit: config.remotive.recentLimit,
+      watchCompanies: config.watchCompanies
+    });
+    console.log(`[Remotive] fetched ${remotiveJobs.length} jobs`);
+    jobs = jobs.concat(remotiveJobs);
+  } catch (err) {
+    console.error('[Remotive] fetch failed:', err.message);
+  }
+
   return jobs;
 }
 
-run(fetchAllJobs, 'Jooble+Jobicy').catch((err) => {
+run(fetchAllJobs, 'Jooble+Jobicy+Remotive').catch((err) => {
   console.error('Fatal error:', err);
   process.exit(1);
 });

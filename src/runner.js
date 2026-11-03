@@ -3,7 +3,7 @@ require('dotenv').config();
 const config = require('./config');
 const { loadSeen, saveSeen } = require('./store');
 const { sendTelegram } = require('./notify');
-const { looksLocationRestricted } = require('./locationFilter');
+const { shouldDropForLocation } = require('./locationFilter');
 
 function isFresh(job) {
   if (!job.postedAt) return true;
@@ -14,8 +14,26 @@ function isFresh(job) {
 
 function matchesKeywords(job) {
   if (job.prefiltered) return true;
-  const haystack = (job.searchText || job.title || '').toLowerCase();
+  // Sources with long descriptions (RemoteOK, WWR, Remotive) match on the
+  // title only: a sales job whose description mentions "customer service"
+  // in passing is not a customer service job. Jooble and Jobicy return short
+  // snippets and are already keyword-searched, so they match on title + snippet.
+  const titleOnly = (config.keywordTitleOnlySources || []).includes(job.source);
+  const haystack = ((titleOnly ? job.title : (job.searchText || job.title)) || '').toLowerCase();
   return config.keywords.some((kw) => haystack.includes(kw.toLowerCase()));
+}
+
+function isWatched(job) {
+  const company = (job.company || '').toLowerCase();
+  return (config.watchCompanies || []).some((w) => company.includes(w.toLowerCase()));
+}
+
+// Decides whether a job is dropped for location reasons. Watched companies
+// skip strict worldwide mode but are still dropped on explicit restrictions.
+function locationDecision(job) {
+  const watched = isWatched(job);
+  const strict = !watched && Boolean(config.worldwideOnly && config.worldwideOnly[job.source]);
+  return { drop: shouldDropForLocation(job, strict), watched };
 }
 
 function escapeHtml(str = '') {
@@ -26,6 +44,7 @@ function formatMessage(job) {
   const lines = [
     `🆕 <b>${escapeHtml(job.title)}</b>`,
     job.company ? `🏢 ${escapeHtml(job.company)}` : null,
+    job.watched ? '⭐ Watched company (location not confirmed worldwide, check it)' : null,
     `📍 ${job.source}`,
     job.location ? `🌍 ${escapeHtml(job.location)}` : null,
     job.salary ? `💰 ${escapeHtml(job.salary)}` : null,
@@ -56,17 +75,19 @@ async function run(fetchAllJobs, label) {
       if (seen[job.id] || seenThisRun.has(job.id)) return false;
       seenThisRun.add(job.id);
       if (!isFresh(job) || !matchesKeywords(job)) return false;
-      if (looksLocationRestricted(job)) {
+      const { drop, watched } = locationDecision(job);
+      if (drop) {
         droppedForLocation += 1;
         return false;
       }
+      job.watched = watched;
       return true;
     })
     .slice(0, config.maxAlertsPerRun);
 
   console.log(
     `[${label}] Checked ${jobs.length} total jobs -> ${newMatches.length} new matches` +
-    (droppedForLocation ? ` (${droppedForLocation} dropped as country-restricted)` : '') + '.'
+    (droppedForLocation ? ` (${droppedForLocation} dropped: restricted or not marked worldwide)` : '') + '.'
   );
 
   for (const job of newMatches) {
@@ -74,6 +95,9 @@ async function run(fetchAllJobs, label) {
       await sendTelegram(token, chatId, formatMessage(job));
       console.log(`Notified: [${job.source}] ${job.title}`);
       seen[job.id] = Date.now();
+      // Save after every alert, so stopping the run part-way (Ctrl+C, closed
+      // terminal, a crash) can't make the same jobs alert again next time.
+      saveSeen(seen);
     } catch (err) {
       console.error(`Failed to notify for "${job.title}": ${err.message}`);
       // Don't mark as seen — we'll retry it on the next run.
@@ -90,4 +114,4 @@ async function run(fetchAllJobs, label) {
   saveSeen(seen);
 }
 
-module.exports = { run };
+module.exports = { run, locationDecision, isWatched, matchesKeywords };

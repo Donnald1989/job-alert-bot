@@ -11,13 +11,26 @@ Telegram the moment they're found, so you're not beaten to applications.
 | We Work Remotely | No | every 15 min | public RSS, no request limit |
 | Jooble | Yes (free) | every 6 hours | free tier capped at 500 requests |
 | Jobicy | No | every 6 hours | fair-use notice asks for infrequent polling |
+| Remotive | No | every 6 hours | asks for no more than ~4 fetches a day; has a real "worldwide" location field |
+
+## Worldwide-only mode
+
+"Remote" alone isn't enough, since many remote jobs are limited to one country.
+`worldwideOnly` in `src/config.js` sets, per source, whether a job must
+explicitly say worldwide / work from anywhere / any country (strict) or is only
+dropped when it explicitly says "US only" etc. (lenient). Explicit restrictions
+are dropped in both modes. A structured location of "Nigeria" or "Africa" also
+counts as open. `watchCompanies` (currently 20four7VA) skips strict mode for
+those companies and marks the alert with a star; explicit restrictions still
+drop them.
 
 ## Files
 
 - `src/config.js` — edit this to change your keywords, WWR feeds, or Jooble/Jobicy searches.
 - `src/locationFilter.js` — drops jobs that read as restricted to one country (US/UK/Canada-only) unless the posting also says worldwide/global/anywhere. **This is a text-pattern filter, not a guarantee** — always check the 🌍 line in the Telegram message yourself.
 - `src/index.js` — the fast (15-min) entry point: RemoteOK + WWR.
-- `src/index-jooble.js` — the slow (6-hour) entry point: Jooble + Jobicy.
+- `src/index-jooble.js` — the slow (6-hour) entry point: Jooble + Jobicy + Remotive.
+- `src/sources/remotive.js` — Remotive source. Keep manual "Run workflow" clicks on the 6-hour workflow rare, they count toward Remotive's ~4 fetches/day.
 - `data/seen.json` — jobs already notified on, so you don't get duplicates. GitHub Actions commits updates to this automatically.
 
 ## Local setup

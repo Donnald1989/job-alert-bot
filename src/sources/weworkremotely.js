@@ -2,7 +2,9 @@
 // Full feed list: https://weworkremotely.com/remote-job-rss-feed
 
 const Parser = require('rss-parser');
-const parser = new Parser();
+// WWR's RSS items include a <region> tag (e.g. "Anywhere in the World",
+// "USA Only") on most postings; ask the parser to keep it.
+const parser = new Parser({ customFields: { item: ['region'] } });
 
 // WWR titles are usually formatted "Company: Job Title", and the category
 // feed itself tells us the job is remote, but some postings still restrict
@@ -34,11 +36,11 @@ async function fetchWWR(feedUrls = []) {
           // WWR doesn't give a structured location field in RSS — any
           // region restriction shows up as plain text in the title or
           // description, which locationFilter.js checks via searchText.
-          location: null,
+          location: item.region || null,
           url: item.link,
           postedAt: item.isoDate || item.pubDate || null,
           salary: null,
-          searchText: `${item.title} ${description}`,
+          searchText: `${item.title} ${item.region || ''} ${description}`,
           prefiltered: false
         });
       }

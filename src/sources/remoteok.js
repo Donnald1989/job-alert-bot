@@ -20,15 +20,16 @@ async function fetchRemoteOK() {
     source: 'RemoteOK',
     title: job.position || job.title || 'Untitled role',
     company: job.company || null,
-    // RemoteOK jobs are remote by definition of the site, but some are
-    // tagged with a specific region restriction in job.location.
-    location: job.location || 'Remote (worldwide unless noted)',
+    // Some RemoteOK jobs carry a region in job.location ("Worldwide",
+    // "United States"). Leave it null when missing: a made-up "worldwide"
+    // default used to make every job look open to the location filter.
+    location: job.location || null,
     url: job.url || job.apply_url || `https://remoteok.com/remote-jobs/${job.id}`,
     postedAt: job.date || null,
     salary: job.salary_min && job.salary_max
       ? `$${job.salary_min} - $${job.salary_max}`
       : null,
-    searchText: `${job.position || ''} ${job.description || ''} ${(job.tags || []).join(' ')}`,
+    searchText: `${job.position || ''} ${job.location || ''} ${job.description || ''} ${(job.tags || []).join(' ')}`,
     prefiltered: false
   }));
 }
